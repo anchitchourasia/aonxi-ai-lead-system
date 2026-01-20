@@ -1,0 +1,600 @@
+{
+  "name": "Aonxi AI Self-Optimization - Daily Analysis",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "7e6d5f06-ffad-428c-ae06-5bda5b9685d4",
+      "name": "Daily Analysis Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1760,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1MdKoKZRMWP97ERQhPzmp0LT88f9NTx71cgQYmZu_9sA",
+          "mode": "list",
+          "cachedResultName": "aa",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1MdKoKZRMWP97ERQhPzmp0LT88f9NTx71cgQYmZu_9sA/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 378778648,
+          "mode": "list",
+          "cachedResultName": "aonxi_leads_sheet",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1MdKoKZRMWP97ERQhPzmp0LT88f9NTx71cgQYmZu_9sA/edit#gid=378778648"
+        },
+        "options": {}
+      },
+      "id": "b29224a9-2056-4b6e-afed-7781af5941b7",
+      "name": "Read All Leads Data",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        -1536,
+        112
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "RANXeci3f1kL5ITz",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Advanced Analytics Engine - Compute Key Metrics\nconst rows = $input.all().map(item => item.json);\nconst total = rows.length || 1;\n\n// === SCORE DISTRIBUTION ===\nconst hot = rows.filter(r => Number(r.score) >= 70).length;\nconst warm = rows.filter(r => Number(r.score) >= 50 && Number(r.score) < 70).length;\nconst cold = rows.filter(r => Number(r.score) < 50).length;\n\nconst avgScore = rows.reduce((sum, r) => sum + (Number(r.score) || 0), 0) / total;\nconst medianScore = rows.map(r => Number(r.score) || 0).sort((a,b) => a-b)[Math.floor(total/2)];\n\n// === TREND ANALYSIS (Last 7 Days vs Previous 7) ===\nconst now = new Date();\nconst sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);\nconst fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);\n\nconst recentLeads = rows.filter(r => new Date(r.timestamp) >= sevenDaysAgo);\nconst previousLeads = rows.filter(r => {\n  const ts = new Date(r.timestamp);\n  return ts >= fourteenDaysAgo && ts < sevenDaysAgo;\n});\n\nconst recentHot = recentLeads.filter(r => Number(r.score) >= 70).length;\nconst previousHot = previousLeads.filter(r => Number(r.score) >= 70).length;\nconst hotTrend = previousHot > 0 ? ((recentHot - previousHot) / previousHot * 100) : 0;\n\nconst recentAvgScore = recentLeads.length > 0 ? \n  recentLeads.reduce((sum, r) => sum + (Number(r.score) || 0), 0) / recentLeads.length : 0;\nconst previousAvgScore = previousLeads.length > 0 ? \n  previousLeads.reduce((sum, r) => sum + (Number(r.score) || 0), 0) / previousLeads.length : 0;\nconst scoreTrend = previousAvgScore > 0 ? ((recentAvgScore - previousAvgScore) / previousAvgScore * 100) : 0;\n\n// === QUALITY INDICATORS ===\nconst withBudget = rows.filter(r => r.budget && r.budget !== 'Not provided' && r.budget !== 'Not specified').length;\nconst budgetRate = Math.round((withBudget / total) * 100);\n\nconst highUrgency = rows.filter(r => (r.urgency || '').toLowerCase() === 'high').length;\nconst urgencyRate = Math.round((highUrgency / total) * 100);\n\nconst businessEmails = rows.filter(r => {\n  const email = r.email || '';\n  return email.includes('@') && !email.includes('gmail') && !email.includes('yahoo') && !email.includes('hotmail');\n}).length;\nconst businessEmailRate = Math.round((businessEmails / total) * 100);\n\nconst withPhone = rows.filter(r => r.phone && r.phone !== 'Not provided').length;\nconst phoneRate = Math.round((withPhone / total) * 100);\n\n// === CONVERSION SIMULATION (Mock CPA) ===\nconst assumedConversionRate = hot / total; // Hot leads as proxy for conversions\nconst mockCPA = assumedConversionRate > 0 ? Math.round(1000 / assumedConversionRate) : 0;\nconst estimatedRevenue = hot * 5000; // Assume $5k avg deal size\nconst estimatedROI = mockCPA > 0 ? Math.round((estimatedRevenue / (mockCPA * hot)) * 100) : 0;\n\n// === GOAL ANALYSIS ===\nconst goalKeywords = {\n  'automation': 0,\n  'lead': 0,\n  'crm': 0,\n  'workflow': 0,\n  'ai': 0,\n  'email': 0,\n  'chatbot': 0\n};\n\nrows.forEach(r => {\n  const goal = (r.goal || '').toLowerCase();\n  Object.keys(goalKeywords).forEach(keyword => {\n    if (goal.includes(keyword)) goalKeywords[keyword]++;\n  });\n});\n\nconst topGoals = Object.entries(goalKeywords)\n  .sort((a, b) => b[1] - a[1])\n  .slice(0, 3)\n  .map(([keyword, count]) => ({ keyword, count, percentage: Math.round((count/total)*100) }));\n\n// === ISSUE DETECTION ===\nconst issues = [];\nif (budgetRate < 40) issues.push({ severity: 'HIGH', issue: 'Low budget disclosure rate', impact: 'Reduces scoring accuracy' });\nif (scoreTrend < -10) issues.push({ severity: 'HIGH', issue: 'Score declining trend', impact: 'Lead quality dropping' });\nif (businessEmailRate < 50) issues.push({ severity: 'MEDIUM', issue: 'Too many personal emails', impact: 'Lower lead quality signal' });\nif (phoneRate < 30) issues.push({ severity: 'MEDIUM', issue: 'Low phone number collection', impact: 'Missing contact data' });\nif (recentLeads.length < previousLeads.length * 0.7) issues.push({ severity: 'HIGH', issue: 'Lead volume declining', impact: 'Fewer opportunities' });\n\n// === SAMPLE RECENT LEADS ===\nconst recentSample = recentLeads.slice(-5).map(r => ({\n  name: r.name,\n  score: r.score,\n  category: r.category,\n  goal: (r.goal || '').substring(0, 50)\n}));\n\nreturn [{\n  analysis_date: now.toISOString(),\n  period: 'last_7_days',\n  metrics: {\n    total_leads: total,\n    recent_leads: recentLeads.length,\n    previous_leads: previousLeads.length,\n    hot_leads: hot,\n    warm_leads: warm,\n    cold_leads: cold,\n    hot_rate: Math.round((hot/total)*100),\n    warm_rate: Math.round((warm/total)*100),\n    cold_rate: Math.round((cold/total)*100),\n    avg_score: Math.round(avgScore * 10) / 10,\n    median_score: medianScore,\n    recent_avg_score: Math.round(recentAvgScore * 10) / 10,\n    previous_avg_score: Math.round(previousAvgScore * 10) / 10,\n    score_trend_pct: Math.round(scoreTrend * 10) / 10,\n    hot_trend_pct: Math.round(hotTrend * 10) / 10,\n    budget_disclosure_rate: budgetRate,\n    high_urgency_rate: urgencyRate,\n    business_email_rate: businessEmailRate,\n    phone_collection_rate: phoneRate\n  },\n  conversion_simulation: {\n    mock_cpa: mockCPA,\n    estimated_conversion_rate: Math.round(assumedConversionRate * 100),\n    estimated_revenue: estimatedRevenue,\n    estimated_roi_pct: estimatedROI\n  },\n  top_goals: topGoals,\n  detected_issues: issues,\n  recent_sample: recentSample,\n  total_issues: issues.length\n}];"
+      },
+      "id": "abe5f478-371a-439d-b18e-7c3bb7a8932b",
+      "name": "Compute Comprehensive Metrics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1328,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=## System Performance Report\n\n**Total Leads:** {{ $json.metrics.total_leads }}\n**Period:** Last 7 days ({{ $json.metrics.recent_leads }} leads)\n\n### Lead Distribution:\n- Hot (70+): {{ $json.metrics.hot_leads }} ({{ $json.metrics.hot_rate }}%)\n- Warm (50-69): {{ $json.metrics.warm_leads }} ({{ $json.metrics.warm_rate }}%)\n- Cold (<50): {{ $json.metrics.cold_leads }} ({{ $json.metrics.cold_rate }}%)\n\n### Performance Trends:\n- Avg Score: {{ $json.metrics.avg_score }}/100\n- Recent 7d Avg: {{ $json.metrics.recent_avg_score }}\n- Previous 7d Avg: {{ $json.metrics.previous_avg_score }}\n- Score Trend: {{ $json.metrics.score_trend_pct }}%\n- Hot Lead Trend: {{ $json.metrics.hot_trend_pct }}%\n\n### Quality Indicators:\n- Budget Disclosure: {{ $json.metrics.budget_disclosure_rate }}%\n- High Urgency: {{ $json.metrics.high_urgency_rate }}%\n- Business Emails: {{ $json.metrics.business_email_rate }}%\n- Phone Collection: {{ $json.metrics.phone_collection_rate }}%\n\n### Top Lead Goals:\n{{ $json.top_goals.map(g => `- ${g.keyword}: ${g.count} leads (${g.percentage}%)`).join('\\n') }}\n\n### Detected Issues:\n{{ JSON.stringify($json.detected_issues, null, 2) }}\n\n### Recent Sample Leads:\n{{ JSON.stringify($json.recent_sample, null, 2) }}\n\n---\n\nAnalyze this data and provide actionable optimization recommendations.",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are an AI optimization analyst for a B2B lead management system.\n\nAnalyze the provided lead data and generate actionable recommendations.\n\nCRITICAL RULES:\n1. Return ONLY valid JSON - no markdown, no code blocks, no explanations\n2. Do not wrap in ```json or ``` - just raw JSON\n3. All fields must be populated\n4. Arrays can be empty [] but should have items if issues exist\n\nInput data you'll receive:\n- total_leads, hot_rate, warm_rate, cold_rate\n- avg_score, budget_rate, business_email_rate\n- score_trend, hot_trend\n\nReturn this EXACT structure:\n\n{\n  \"health\": {\n    \"status\": \"EXCELLENT\",\n    \"score\": 85,\n    \"assessment\": \"System is performing well with strong HOT lead capture rate of 67%.\"\n  },\n  \"metrics\": {\n    \"total_leads\": 9,\n    \"hot_leads\": 6,\n    \"warm_leads\": 1,\n    \"cold_leads\": 2,\n    \"hot_rate\": 67,\n    \"avg_score\": 68.7,\n    \"budget_disclosure_rate\": 89,\n    \"phone_collection_rate\": 78,\n    \"business_email_rate\": 0\n  },\n  \"critical_issues\": [\n    \"Business Email Collection: 0% business emails indicates critical gap in B2B data quality\",\n    \"Phone Collection: Rate below 80% threshold limits outreach effectiveness\"\n  ],\n  \"recommendations\": {\n    \"prompt_improvements\": [\n      \"Ask budget question earlier in conversation flow\",\n      \"Frame budget as 'investment range' instead of 'budget'\"\n    ],\n    \"scoring_adjustments\": [\n      \"Increase business email weight from 15 to 20 points\",\n      \"Add 5 bonus points for phone number provided\"\n    ],\n    \"routing_optimizations\": [\n      \"Lower hot threshold to 65 to capture more high-intent leads\"\n    ],\n    \"priority_actions\": [\n      \"**HIGH Priority:** Implement business email validation to achieve >50% capture within 30 days | Rationale: 0% business emails limits B2B outreach | Expected impact: +40% lead quality | Timeline: 0-30 days\",\n      \"**MEDIUM Priority:** Optimize phone collection prompts to reach >80% within 60 days | Rationale: Phone enables faster follow-up | Expected impact: +15% conversion | Timeline: 30-90 days\"\n    ]\n  },\n  \"conversion\": {\n    \"estimated_rate\": 57,\n    \"estimated_revenue\": \"$180000\"\n  },\n  \"expected_impact\": \"Implementing these recommendations will improve lead quality by 25-30%, increase conversion rates by 10-15%, and enable more effective B2B outreach.\",\n  \"period\": \"last_7_days\"\n}\n\nHEALTH STATUS RULES:\n- EXCELLENT: score 80-100, high metrics, few issues\n- GOOD: score 60-79, decent metrics, some issues\n- NEEDS_ATTENTION: score 40-59, concerning metrics\n- CRITICAL: score 0-39, major issues\n\nCRITICAL ISSUES TO DETECT:\n- business_email_rate < 25%\n- budget_rate < 60%\n- phone_collection < 40%\n- avg_score < 50\n\nPRIORITY ACTIONS FORMAT:\n\"**HIGH Priority:** Action | Rationale: Why | Expected impact: Result | Timeline: X days\"\n",
+          "maxIterations": 5
+        }
+      },
+      "id": "4d161d62-abc5-48c2-8ed1-9b0421494428",
+      "name": "AI Optimization Council",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.6,
+      "position": [
+        -1104,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================\n// MERGE OPTIMIZATION ANALYSIS & RECOMMENDATIONS\n// Combines AI insights with system metrics\n// ============================================\n\n// Get parsed AI output (from Parse AI Response node)\nconst aiAnalysis = $('Parse AI Response').first().json;\n\n// Get metrics (from Compute Comprehensive Metrics node)\nconst metrics = $('Compute Comprehensive Metrics').first().json;\n\nconsole.log('AI Analysis received:', JSON.stringify(aiAnalysis, null, 2));\nconsole.log('Metrics received:', JSON.stringify(metrics, null, 2));\n\n// ============================================\n// SAFE FIELD ACCESS HELPERS\n// ============================================\n\nfunction safeGet(obj, path, fallback = '') {\n  try {\n    const keys = path.split('.');\n    let result = obj;\n    for (const key of keys) {\n      if (result && typeof result === 'object' && key in result) {\n        result = result[key];\n      } else {\n        return fallback;\n      }\n    }\n    return result !== undefined && result !== null ? result : fallback;\n  } catch (e) {\n    return fallback;\n  }\n}\n\n// ============================================\n// BUILD COMPLETE ANALYSIS OBJECT\n// ============================================\n\nconst completeAnalysis = {\n  // Timestamp\n  date: new Date().toISOString(),\n  period: safeGet(aiAnalysis, 'period', 'last_7_days'),\n  \n  // ========== HEALTH ASSESSMENT ==========\n  health: {\n    status: safeGet(aiAnalysis, 'health.status', 'UNKNOWN'),\n    score: safeGet(aiAnalysis, 'health.score', 0),\n    assessment: safeGet(aiAnalysis, 'health.assessment', 'No assessment available')\n  },\n  \n  // ========== COMPREHENSIVE METRICS ==========\n  metrics: {\n    total_leads: safeGet(aiAnalysis, 'metrics.total_leads', metrics.total_leads || 0),\n    recent_leads: safeGet(aiAnalysis, 'metrics.recent_leads', metrics.recent_leads || 0),\n    hot_leads: safeGet(aiAnalysis, 'metrics.hot_leads', Math.round((metrics.hot_rate / 100) * (metrics.total_leads || 0))),\n    warm_leads: safeGet(aiAnalysis, 'metrics.warm_leads', Math.round((parseFloat(String(metrics.warm_rate).replace('\\n', '')) / 100) * (metrics.total_leads || 0))),\n    cold_leads: safeGet(aiAnalysis, 'metrics.cold_leads', Math.round((metrics.cold_rate / 100) * (metrics.total_leads || 0))),\n    hot_rate: safeGet(aiAnalysis, 'metrics.hot_rate', metrics.hot_rate || 0),\n    avg_score: safeGet(aiAnalysis, 'metrics.avg_score', parseFloat(String(metrics.avg_score).replace('=', '')) || 0),\n    budget_disclosure_rate: safeGet(aiAnalysis, 'metrics.budget_disclosure_rate', metrics.budget_rate || 0),\n    phone_collection_rate: safeGet(aiAnalysis, 'metrics.phone_collection_rate', metrics.phone_collection_rate || 0),\n    business_email_rate: safeGet(aiAnalysis, 'metrics.business_email_rate', metrics.business_email_rate || 0)\n  },\n  \n  // ========== CRITICAL ISSUES ==========\n  critical_issues: Array.isArray(aiAnalysis.critical_issues) \n    ? aiAnalysis.critical_issues \n    : [],\n  \n  // ========== RECOMMENDATIONS ==========\n  recommendations: {\n    prompt_improvements: safeGet(aiAnalysis, 'recommendations.prompt_improvements', []),\n    scoring_adjustments: safeGet(aiAnalysis, 'recommendations.scoring_adjustments', []),\n    routing_optimizations: safeGet(aiAnalysis, 'recommendations.routing_optimizations', []),\n    priority_actions: safeGet(aiAnalysis, 'recommendations.priority_actions', [])\n  },\n  \n  // ========== CONVERSION ESTIMATES ==========\n  conversion: {\n    estimated_rate: safeGet(aiAnalysis, 'conversion.estimated_rate', 0),\n    estimated_revenue: safeGet(aiAnalysis, 'conversion.estimated_revenue', '$0')\n  },\n  \n  // ========== IMPACT SUMMARY ==========\n  expected_impact: safeGet(aiAnalysis, 'expected_impact', 'No impact assessment available'),\n  \n  // ========== FLAGS FOR ROUTING ==========\n  issues_detected: (\n    metrics.business_email_rate === 0 || \n    (Array.isArray(aiAnalysis.critical_issues) && aiAnalysis.critical_issues.length > 0)\n  ) ? 'critical' : '',\n  \n  // ========== TOP PRIORITY ==========\n  top_priority: (() => {\n    const priorityActions = safeGet(aiAnalysis, 'recommendations.priority_actions', []);\n    if (Array.isArray(priorityActions)) {\n      const highPriority = priorityActions.find(a => typeof a === 'string' && a.includes('HIGH'));\n      return highPriority || '';\n    }\n    return '';\n  })(),\n  \n  // ========== PRIORITY SUMMARY COUNTS ==========\n  priority_summary: (() => {\n    const priorityActions = safeGet(aiAnalysis, 'recommendations.priority_actions', []);\n    if (Array.isArray(priorityActions)) {\n      return {\n        high: priorityActions.filter(a => typeof a === 'string' && a.includes('HIGH')).length,\n        medium: priorityActions.filter(a => typeof a === 'string' && a.includes('MEDIUM')).length,\n        low: priorityActions.filter(a => typeof a === 'string' && a.includes('LOW')).length\n      };\n    }\n    return { high: 0, medium: 0, low: 0 };\n  })(),\n  \n  // ========== RAW METRICS FOR REFERENCE ==========\n  total_leads: metrics.total_leads || 0,\n  recent_leads: metrics.recent_leads || 0,\n  hot_rate: metrics.hot_rate || 0,\n  business_email_rate: metrics.business_email_rate || 0\n};\n\nconsole.log('Complete Analysis built:', JSON.stringify(completeAnalysis, null, 2));\n\nreturn completeAnalysis;\n"
+      },
+      "id": "8ffefd76-d5cb-469b-b02c-f06c0e006bbb",
+      "name": "Merge Analysis & Recommendations",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -608,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0A8P72DN79",
+          "mode": "list",
+          "cachedResultName": "social"
+        },
+        "text": "=🤖 *AI OPTIMIZATION REPORT*\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n📊 *HEALTH STATUS*\n• Status: {{ $('Merge Analysis & Recommendations').item.json.health.status }} {{ $('Merge Analysis & Recommendations').item.json.health.score >= 80 ? '🟢' : ($('Merge Analysis & Recommendations').item.json.health.score >= 60 ? '🟡' : '🔴') }}\n• Score: {{ $('Merge Analysis & Recommendations').item.json.health.score }}/100\n• Period: {{ $('Merge Analysis & Recommendations').item.json.period }}\n• Generated: {{ $now.format('DD/MM/YYYY, HH:mm:ss') }}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n📈 *KEY METRICS*\n• Total Leads: {{ $('Merge Analysis & Recommendations').item.json.metrics.total_leads }}\n• HOT Leads: {{ $('Merge Analysis & Recommendations').item.json.metrics.hot_leads }} ({{ $('Merge Analysis & Recommendations').item.json.metrics.hot_rate }}%)\n• WARM Leads: {{ $('Merge Analysis & Recommendations').item.json.metrics.warm_leads }} ({{ Math.round(($('Merge Analysis & Recommendations').item.json.metrics.warm_leads / $('Merge Analysis & Recommendations').item.json.metrics.total_leads) * 100) }}%)\n• COLD Leads: {{ $('Merge Analysis & Recommendations').item.json.metrics.cold_leads }} ({{ Math.round(($('Merge Analysis & Recommendations').item.json.metrics.cold_leads / $('Merge Analysis & Recommendations').item.json.metrics.total_leads) * 100) }}%)\n• Avg Score: {{ $('Merge Analysis & Recommendations').item.json.metrics.avg_score }}/100\n• Budget Disclosure: {{ $('Merge Analysis & Recommendations').item.json.metrics.budget_disclosure_rate }}%\n• Phone Collection: {{ $('Merge Analysis & Recommendations').item.json.metrics.phone_collection_rate }}%\n• Est. Conversion: {{ $('Merge Analysis & Recommendations').item.json.conversion.estimated_rate }}%\n• Est. Revenue: ${{ $('Merge Analysis & Recommendations').item.json.conversion.estimated_revenue }}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n🔴 *CRITICAL ISSUES ({{ $('Merge Analysis & Recommendations').item.json.critical_issues.length }})*\n{{ $('Merge Analysis & Recommendations').item.json.critical_issues.map((issue, i) => `${i+1}. ${issue}`).join('\\n') }}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n🎯 *HIGH PRIORITY ACTIONS ({{ $('Merge Analysis & Recommendations').item.json.priority_summary.high }})*\n{{ $('Merge Analysis & Recommendations').item.json.recommendations.priority_actions.filter(a => a.includes('HIGH')).map((action, i) => {\n  const mainAction = action.split('Rationale:')[0].replace('**HIGH Priority:**', '').trim();\n  const rationale = action.includes('Rationale:') ? action.split('Rationale:')[1].split('Expected impact:')[0].replace('Rationale:', '').trim() : 'Critical for lead quality';\n  return `${i+1}. ${mainAction}\\n   📌 ${rationale}`;\n}).join('\\n\\n') }}\n\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n🌡️ *MEDIUM PRIORITY ACTIONS ({{ $('Merge Analysis & Recommendations').item.json.priority_summary.medium }})*\n{{ $('Merge Analysis & Recommendations').item.json.recommendations.priority_actions.filter(a => a.includes('MEDIUM')).map((action, i) => `${i+1}. ${action.split('Rationale:')[0].replace('**MEDIUM Priority:**', '').trim()}`).join('\\n') }}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n💡 *EXPECTED IMPACT*\n{{ $('Merge Analysis & Recommendations').item.json.expected_impact }}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n📊 View full optimization logs in Google Sheets\n\n_Automated with this n8n workflow_\n",
+        "otherOptions": {}
+      },
+      "id": "d84014b0-4ff5-4a17-b720-01e863dad39a",
+      "name": "Post Optimization Report",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        -448,
+        112
+      ],
+      "webhookId": "fd00898f-1cb6-4c4a-ac53-fa6c02af8680",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "dNzmyt0qCTRVyCiB",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1MdKoKZRMWP97ERQhPzmp0LT88f9NTx71cgQYmZu_9sA",
+          "mode": "list",
+          "cachedResultName": "aa",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1MdKoKZRMWP97ERQhPzmp0LT88f9NTx71cgQYmZu_9sA/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 255697088,
+          "mode": "list",
+          "cachedResultName": "aonxi_optimization_log_sheet",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1MdKoKZRMWP97ERQhPzmp0LT88f9NTx71cgQYmZu_9sA/edit#gid=255697088"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "date": "={{ $('Merge Analysis & Recommendations').item.json.generated_at }}",
+            "total_leads": "={{ $('Merge Analysis & Recommendations').item.json.metrics.total_leads }}",
+            "recent_leads": "={{ $('Merge Analysis & Recommendations').item.json.metrics.total_leads }}",
+            "hot_rate": "={{ $('Merge Analysis & Recommendations').item.json.metrics.hot_rate }}",
+            "warm_rate": "={{ Math.round(($('Merge Analysis & Recommendations').item.json.metrics.warm_leads / $('Merge Analysis & Recommendations').item.json.metrics.total_leads) * 100) }}\n",
+            "cold_rate": "={{ Math.round(($('Merge Analysis & Recommendations').item.json.metrics.cold_leads / $('Merge Analysis & Recommendations').item.json.metrics.total_leads) * 100) }}",
+            "avg_score": "=={{ $('Merge Analysis & Recommendations').item.json.metrics.avg_score }}",
+            "score_trend": "={{ $('Merge Analysis & Recommendations').item.json.metrics.avg_score > 60 ? 'IMPROVING' : 'NEEDS_ATTENTION' }}",
+            "hot_trend": "={{ $('Merge Analysis & Recommendations').item.json.metrics.hot_rate > 50 ? 'INCREASING' : 'STABLE' }}",
+            "budget_rate": "={{ $('Merge Analysis & Recommendations').item.json.metrics.budget_disclosure_rate }}",
+            "business_email_rate": "={{ $('Merge Analysis & Recommendations').item.json.metrics.business_email_rate }}",
+            "assessment": "={{ $('Merge Analysis & Recommendations').item.json.health.assessment }}",
+            "estimated_impact": "={{ $('Merge Analysis & Recommendations').item.json.expected_impact }}",
+            "issues_detected": "={{ $('Merge Analysis & Recommendations').item.json.critical_issues.join(' | ') }}",
+            "top_priority": "={{ $('Merge Analysis & Recommendations').item.json.recommendations.priority_actions.filter(a => a.includes('HIGH')).map(a => a.split('Rationale:')[0].replace('**HIGH Priority:**', '').trim()).join(' | ') }}",
+            "full_recommendations": "={{ JSON.stringify($('Merge Analysis & Recommendations').item.json.recommendations) }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "total_leads",
+              "displayName": "total_leads",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "recent_leads",
+              "displayName": "recent_leads",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hot_rate",
+              "displayName": "hot_rate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "warm_rate",
+              "displayName": "warm_rate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cold_rate",
+              "displayName": "cold_rate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "avg_score",
+              "displayName": "avg_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "score_trend",
+              "displayName": "score_trend",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hot_trend",
+              "displayName": "hot_trend",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "budget_rate",
+              "displayName": "budget_rate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "business_email_rate",
+              "displayName": "business_email_rate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "assessment",
+              "displayName": "assessment",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estimated_impact",
+              "displayName": "estimated_impact",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "issues_detected",
+              "displayName": "issues_detected",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "top_priority",
+              "displayName": "top_priority",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "full_recommendations",
+              "displayName": "full_recommendations",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "35b2c283-e881-4270-9034-022c63b1976b",
+      "name": "Log Optimization Analysis",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        -240,
+        112
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "RANXeci3f1kL5ITz",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "critical",
+              "leftValue": "={{ $json.business_email_rate }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "7ed490d9-0858-476a-bd4a-6a27fc7ee63b",
+              "leftValue": "={{ $json.issues_detected }}",
+              "rightValue": "critical",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e7e20bc9-6a7e-4391-a992-ad1815fe5e54",
+      "name": "Critical Issues?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -16,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0A8P72DN79",
+          "mode": "list",
+          "cachedResultName": "social"
+        },
+        "text": "=🚨 *CRITICAL ALERT: System Needs Attention*\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n⚠️ *ALERT DETAILS*\n• Date: {{ $json.date }}\n• Critical Issues: {{ $json.issues_detected.split(' | ').length }}\n• Business Email Rate: {{ $json.business_email_rate }}% ⚠️\n• Hot Lead Rate: {{ $json.hot_rate }}%\n• Total Leads: {{ $json.total_leads }}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n🔴 *CRITICAL ISSUES DETECTED:*\n{{ $json.issues_detected.split(' | ').map((issue, i) => `${i+1}. ${issue}`).join('\\n\\n') }}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n⚡ *IMMEDIATE ACTIONS REQUIRED:*\n{{ $json.top_priority.split(' | ').map((action, i) => `${i+1}. ${action}`).join('\\n\\n') }}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n💡 *ESTIMATED IMPACT:*\n{{ $json.estimated_impact }}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n@channel Please review immediately and implement recommended changes within 24 hours!\n\n📊 View full optimization report above\n📈 View detailed logs in Google Sheets\n\n_Automated critical alert from Aonxi AI Lead System_\n",
+        "otherOptions": {}
+      },
+      "id": "09ffe850-2a93-4164-bd28-b81c3da1a7a2",
+      "name": "Critical Alert Escalation",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        208,
+        0
+      ],
+      "webhookId": "e9b996da-c6ae-4bca-a25b-868a8cc619f9",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "dNzmyt0qCTRVyCiB",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -1248,
+        320
+      ],
+      "id": "0c4610d8-9f24-476a-b88f-60197971b514",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "wfIlFenlaqS7dHbG",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================\n// ROBUST AI RESPONSE PARSER\n// Handles any format, never throws errors\n// ============================================\n\n// Get the raw AI output\nconst rawOutput = $('AI Optimization Council').item.json.output;\n\nconsole.log('Raw AI Output Type:', typeof rawOutput);\nconsole.log('Raw AI Output:', rawOutput);\n\n// ============================================\n// FUNCTION: Safe JSON Parser\n// ============================================\nfunction safeParseJSON(input, fallback = {}) {\n  // If already an object, return it\n  if (typeof input === 'object' && input !== null) {\n    return input;\n  }\n  \n  // If string, try to parse\n  if (typeof input === 'string') {\n    try {\n      // Remove markdown code blocks if present\n      let cleaned = input\n        .replace(/```json\\n?/g, '')\n        .replace(/```\\n?/g, '')\n        .trim();\n      \n      // Parse JSON\n      return JSON.parse(cleaned);\n    } catch (e) {\n      console.error('JSON Parse Error:', e.message);\n      return fallback;\n    }\n  }\n  \n  // If neither string nor object, return fallback\n  return fallback;\n}\n\n// ============================================\n// PARSE THE AI OUTPUT\n// ============================================\nconst parsed = safeParseJSON(rawOutput, {\n  health: {\n    status: 'UNKNOWN',\n    score: 0,\n    assessment: 'AI analysis failed to parse'\n  },\n  metrics: {},\n  critical_issues: ['AI response parsing error'],\n  recommendations: {\n    prompt_improvements: [],\n    scoring_adjustments: [],\n    routing_optimizations: [],\n    priority_actions: ['**HIGH Priority:** Fix AI Optimization Council output format']\n  },\n  conversion: {\n    estimated_rate: 0,\n    estimated_revenue: '$0'\n  },\n  expected_impact: 'Cannot generate recommendations - AI response format error',\n  period: 'last_7_days'\n});\n\n// ============================================\n// VALIDATE & FILL MISSING FIELDS\n// ============================================\n\n// Ensure all required fields exist\nconst validatedOutput = {\n  health: parsed.health || {\n    status: 'UNKNOWN',\n    score: 0,\n    assessment: 'No health assessment provided'\n  },\n  \n  metrics: parsed.metrics || {},\n  \n  critical_issues: Array.isArray(parsed.critical_issues) \n    ? parsed.critical_issues \n    : [],\n  \n  recommendations: {\n    prompt_improvements: parsed.recommendations?.prompt_improvements || [],\n    scoring_adjustments: parsed.recommendations?.scoring_adjustments || [],\n    routing_optimizations: parsed.recommendations?.routing_optimizations || [],\n    priority_actions: parsed.recommendations?.priority_actions || []\n  },\n  \n  conversion: parsed.conversion || {\n    estimated_rate: 0,\n    estimated_revenue: '$0'\n  },\n  \n  expected_impact: parsed.expected_impact || 'No impact assessment provided',\n  \n  period: parsed.period || 'last_7_days'\n};\n\n// ============================================\n// GET METRICS FROM PREVIOUS NODE\n// ============================================\nconst metricsInput = $('Compute Comprehensive Metrics').item.json;\n\n// Fill in metrics if AI didn't provide them\nif (!validatedOutput.metrics.total_leads) {\n  validatedOutput.metrics = {\n    total_leads: metricsInput.total_leads || 0,\n    recent_leads: metricsInput.recent_leads || 0,\n    hot_leads: Math.round((metricsInput.hot_rate / 100) * (metricsInput.total_leads || 0)),\n    warm_leads: Math.round((parseFloat(String(metricsInput.warm_rate).replace('\\n', '')) / 100) * (metricsInput.total_leads || 0)),\n    cold_leads: Math.round((metricsInput.cold_rate / 100) * (metricsInput.total_leads || 0)),\n    hot_rate: metricsInput.hot_rate || 0,\n    avg_score: parseFloat(String(metricsInput.avg_score).replace('=', '')) || 0,\n    budget_disclosure_rate: metricsInput.budget_rate || 0,\n    phone_collection_rate: metricsInput.phone_collection_rate || 0,\n    business_email_rate: metricsInput.business_email_rate || 0\n  };\n}\n\n// ============================================\n// AUTO-DETECT CRITICAL ISSUES IF MISSING\n// ============================================\nif (validatedOutput.critical_issues.length === 0) {\n  const autoIssues = [];\n  \n  if (metricsInput.business_email_rate === 0) {\n    autoIssues.push('Business Email Collection: 0% business emails indicates a critical gap in data quality for professional B2B outreach');\n  }\n  \n  if (metricsInput.budget_rate < 60) {\n    autoIssues.push(`Budget Disclosure: Only ${metricsInput.budget_rate}% of leads disclosed budget, below 60% threshold`);\n  }\n  \n  if (metricsInput.phone_collection_rate && metricsInput.phone_collection_rate < 40) {\n    autoIssues.push(`Phone Collection: Only ${metricsInput.phone_collection_rate}% collected, below 40% threshold`);\n  }\n  \n  const avgScore = parseFloat(String(metricsInput.avg_score).replace('=', ''));\n  if (avgScore < 50) {\n    autoIssues.push(`Low Average Score: ${avgScore}/100 indicates poor lead quality`);\n  }\n  \n  if (autoIssues.length > 0) {\n    validatedOutput.critical_issues = autoIssues;\n  }\n}\n\n// ============================================\n// AUTO-GENERATE PRIORITY ACTIONS IF MISSING\n// ============================================\nif (validatedOutput.recommendations.priority_actions.length === 0) {\n  const autoActions = [];\n  \n  if (metricsInput.business_email_rate === 0) {\n    autoActions.push('**HIGH Priority:** Implement stricter business email validation in chatbot to achieve >50% business email capture within 30 days | Rationale: 0% business emails severely limits B2B outreach effectiveness and email deliverability | Expected impact: Improve lead quality by 40% and increase professional contact rate | Timeline: 0-30 days');\n  }\n  \n  if (metricsInput.budget_rate < 60) {\n    autoActions.push('**MEDIUM Priority:** Reframe budget question as \"investment range\" and ask earlier in conversation | Rationale: Budget disclosure critical for lead qualification | Expected impact: Increase budget disclosure to 75%+ | Timeline: 30-60 days');\n  }\n  \n  if (autoActions.length > 0) {\n    validatedOutput.recommendations.priority_actions = autoActions;\n  }\n}\n\n// ============================================\n// RETURN VALIDATED OUTPUT\n// ============================================\nreturn validatedOutput;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -752,
+        112
+      ],
+      "id": "90f7ceb7-b057-406c-a545-eb82054316fc",
+      "name": "Parse AI Response"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0A8P72DN79",
+          "mode": "list",
+          "cachedResultName": "social"
+        },
+        "text": "=✅ *SYSTEM HEALTH CHECK: ALL CLEAR*  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━  🎉 *GOOD NEWS* Your lead system is performing well! No critical issues detected.  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━  📊 *WEEKLY SUMMARY* • Status: {{ $('Merge Analysis & Recommendations').item.json.health.status }} • Health Score: {{ $('Merge Analysis & Recommendations').item.json.health.score }}/100 • Total Leads: {{ $('Merge Analysis & Recommendations').item.json.total_leads }} • HOT Rate: {{ $('Merge Analysis & Recommendations').item.json.hot_rate }}% • Critical Issues: 0 ✅  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━  💡 *NEXT STEPS* • Continue monitoring lead quality • Review optimization recommendations in full report above • Next analysis: In 7 days  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━  🤖 _Automated health check from Aonxi AI Lead System_ 🕐 _Analysis completed at {{ new Date().toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }) }}_  📊 View full optimization logs in Google Sheets",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        192,
+        208
+      ],
+      "id": "5d7e3dd8-bfc2-41d1-a8a4-4c8ee1c55061",
+      "name": "Send a message",
+      "webhookId": "d6555206-e5b2-477e-9e58-8e788c1b9704",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "NoAbggusCS8ELT8r",
+          "name": "Slack account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Daily Analysis Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read All Leads Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read All Leads Data": {
+      "main": [
+        [
+          {
+            "node": "Compute Comprehensive Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Comprehensive Metrics": {
+      "main": [
+        [
+          {
+            "node": "AI Optimization Council",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Optimization Council": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Analysis & Recommendations": {
+      "main": [
+        [
+          {
+            "node": "Post Optimization Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Optimization Report": {
+      "main": [
+        [
+          {
+            "node": "Log Optimization Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Optimization Analysis": {
+      "main": [
+        [
+          {
+            "node": "Critical Issues?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Critical Issues?": {
+      "main": [
+        [
+          {
+            "node": "Critical Alert Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Optimization Council",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Response": {
+      "main": [
+        [
+          {
+            "node": "Merge Analysis & Recommendations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "d316cb54-7fc3-423c-bd4b-60adb268ff72",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "09d108e472cbb548be7c98a9cd0c301ac07177400fc615e9faf8fa03fe0892de"
+  },
+  "id": "auQCFiNdaOSCgqIGIvUyn",
+  "tags": []
+}

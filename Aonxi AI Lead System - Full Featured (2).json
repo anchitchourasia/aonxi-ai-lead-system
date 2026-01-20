@@ -1,0 +1,1765 @@
+{
+  "name": "Aonxi AI Lead System - Full Featured",
+  "nodes": [
+    {
+      "parameters": {
+        "public": true,
+        "initialMessages": "Hi! 👋 I'm your AI assistant. I help businesses automate their workflows.\n\nTell me:\n1. What's your business challenge?\n2. What's your budget range?\n3. How urgent is this?",
+        "options": {
+          "subtitle": "Intelligent Automation Advisor",
+          "title": "Aonxi AI Assistant"
+        }
+      },
+      "id": "b3ddd33f-69d1-4842-b4a3-57f56dd020bf",
+      "name": "Chat Trigger",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -2336,
+        272
+      ],
+      "webhookId": "aonxi-ai-chat"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.chatInput }}",
+        "options": {
+          "systemMessage": "You are a lead qualification specialist for Aonxi AI Automation. Your job is to have a natural, friendly conversation to extract the following information:\n\nREQUIRED INFO:\n- Full name\n- Email address\n- Company name\n- Industry/sector\n- Main business goal or challenge\n- Budget range\n\nOPTIONAL INFO:\n- Phone number\n- Urgency level (high/medium/low)\n\nCONVERSATION STRATEGY:\n1. Ask for name and email first\n2. Then ask about company and industry\n3. Understand their business challenge/goal\n4. Ask about budget range\n5. Ask about urgency/timeline\n6. Summarize everything and confirm\n\nWhen you've collected all information, provide a complete summary and ask \"Does that all sound correct to you?\"\n\nWhen they confirm, output the summary followed by \"\\n\\nCONFIRMED\" on a new line.\n\nREMEMBER: You have memory enabled, so you can reference previous messages in the conversation. Build rapport and have a natural conversation.\n",
+          "maxIterations": 10
+        }
+      },
+      "id": "a8b0938e-ffb7-4739-8744-05f8565794a3",
+      "name": "Qualification Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.6,
+      "position": [
+        -2128,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Chat Trigger').item.json.sessionId }}"
+      },
+      "id": "67ab969f-a39c-4c09-a53c-4ae6ba21696b",
+      "name": "Chat Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.2,
+      "position": [
+        -2128,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "trigger-extract",
+              "leftValue": "={{ $json.output }}",
+              "rightValue": "CONFIRMED",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "9a80f6e6-674b-4947-848a-39f1a4417c6b",
+      "name": "Ready for Processing?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -1856,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=={{ $json.fullConversation }}\n\nExtract all lead information from this conversation into structured JSON.\n",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a data extraction specialist. Extract lead information from the conversation provided and output structured JSON.\n\nThe conversation was handled by a qualification agent that collected:\n- Full name\n- Email address  \n- Phone number\n- Company name\n- Industry/sector\n- Business goal/challenge\n- Budget range\n- Urgency level\n\nExtract these fields into JSON:\n- name: Full name (string)\n- email: Email address (string)\n- phone: Phone number or \"Not provided\" (string)\n- company: Company name (string)\n- industry: Industry type (string)\n- goal: Business goal/challenge (string)\n- budget_indicator: Budget range like \"$30k-50k\" (string)\n- urgency_level: \"high\", \"medium\", or \"low\" (string)\n- message_summary: Brief 2-sentence summary (string)\n\nRules:\n1. Extract ONLY information explicitly stated in the conversation\n2. Use \"Not provided\" for missing optional fields\n3. Output ONLY valid JSON - no explanations\n4. Be precise with values from the conversation\n"
+        }
+      },
+      "id": "1158d967-5d90-4b12-9266-9473fc7bb7c0",
+      "name": "AI Council: Data Extractor",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.6,
+      "position": [
+        -1488,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"name\": {\n      \"type\": \"string\",\n      \"description\": \"Full name of the lead\"\n    },\n    \"email\": {\n      \"type\": \"string\",\n      \"description\": \"Email address\"\n    },\n    \"phone\": {\n      \"type\": \"string\",\n      \"description\": \"Phone number or 'Not provided'\"\n    },\n    \"company\": {\n      \"type\": \"string\",\n      \"description\": \"Company name\"\n    },\n    \"industry\": {\n      \"type\": \"string\",\n      \"description\": \"Industry or sector\"\n    },\n    \"goal\": {\n      \"type\": \"string\",\n      \"description\": \"Business goal or challenge\"\n    },\n    \"budget_indicator\": {\n      \"type\": \"string\",\n      \"description\": \"Budget range like $30k-50k\"\n    },\n    \"urgency_level\": {\n      \"type\": \"string\",\n      \"enum\": [\"high\", \"medium\", \"low\"],\n      \"description\": \"Urgency level\"\n    },\n    \"message_summary\": {\n      \"type\": \"string\",\n      \"description\": \"Brief summary of their needs\"\n    }\n  },\n  \"required\": [\"name\", \"email\", \"company\", \"industry\", \"goal\", \"budget_indicator\", \"urgency_level\", \"message_summary\"]\n}\n"
+      },
+      "id": "96b93b1c-ea85-4d19-a9c2-70f35737f67c",
+      "name": "Data Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -1568,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Lead Data:\nName: {{ $json.output.name }}\nEmail: {{ $json.output.email }}\nCompany: {{ $json.output.company }}\nGoal: {{ $json.output.goal }}\nBudget: {{ $json.output.budget_indicator }}\nUrgency: {{ $json.output.urgency_level }}\n\nResearch and provide strategic recommendations.",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a strategic B2B sales research analyst specializing in SaaS and AI automation solutions.\n\nYour role is to analyze lead information and provide strategic recommendations for the sales approach.\n\nFor the provided lead, analyze:\n1. Industry Analysis: What are the key challenges in their industry (SaaS) related to their goal?\n2. Market Fit: How well does their goal align with typical AI automation solutions?\n3. Budget Assessment: Is the budget realistic for their needs?\n4. Urgency Indicator: What does their urgency level tell us about their buying intent?\n5. Recommended Approach: What sales strategy should we use?\n\nProvide a concise strategic analysis (3-4 sentences) focusing on:\n- Why this lead is/isn't a good fit\n- Key pain points to address in sales conversations\n- Recommended next steps\n- Any red flags or opportunities\n\nBe specific and actionable.\n",
+          "maxIterations": 3
+        }
+      },
+      "id": "9c326d0d-24c4-4c86-94ad-4ff0a8f5a6f2",
+      "name": "AI Council: Research Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.6,
+      "position": [
+        -1104,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"industry_trends\": [\"AI adoption increasing\", \"Automation becoming priority\"],\n  \"automation_opportunities\": [\"Lead scoring\", \"Email nurture\", \"CRM sync\"],\n  \"competitor_activity\": \"Most competitors using basic automation\",\n  \"recommended_solutions\": [\"AI chatbot\", \"Workflow automation\", \"CRM integration\"],\n  \"estimated_roi\": \"3x within 6 months\"\n}"
+      },
+      "id": "5cba5365-789d-4e39-ab4f-6cf79f2aa938",
+      "name": "Research Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -1088,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Lead Info: {{ JSON.stringify($('AI Council: Data Extractor').item.json.output) }}\nResearch: {{ JSON.stringify($json.output) }}\nProvide final scoring and strategy.\n",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a B2B lead scoring specialist for Aonxi AI Automation. Score leads 0-100 based on multiple criteria and provide strategic recommendations for the sales approach.\n\nSCORING CRITERIA (0-100):\n\n1. BUDGET SCORE (0-30 points):\n   • $50,000+ = 30 points\n   • $30,000-$50,000 = 25 points\n   • $20,000-$30,000 = 22 points\n   • $10,000-$20,000 = 18 points\n   • $5,000-$10,000 = 13 points\n   • $1,000-$5,000 = 8 points\n   • $500-$1,000 = 5 points\n   • Under $500 total OR $50-100/month = 3-5 points ⚠️\n\n2. URGENCY SCORE (0-30 points):\n   • 0-3 months + \"need solution now\" = 30 points\n   • 3-4 months + clear timeline = 25 points\n   • 4-6 months + evaluating options = 18 points\n   • 6-9 months + planning phase = 10 points\n   • 6-12+ months + \"just exploring\" = 5 points ⚠️\n   • \"Future planning\" + \"no rush\" = 3 points ⚠️\n\n3. FIT SCORE (0-30 points):\n   • Specific goals + measurable KPIs + urgent pain = 30 points\n   • Clear problem + some metrics + moderate pain = 22 points\n   • General interest + vague needs + no urgency = 12 points\n   • \"Curious about\" + \"no specific plans\" = 8 points ⚠️\n   • \"Just browsing\" + no pain points = 3 points ⚠️\n\n4. ROI POTENTIAL SCORE (0-10 points):\n   • High ROI (clear time/cost savings + revenue impact) = 10 points\n   • Moderate ROI (some benefits + reasonable budget) = 6 points\n   • Low ROI (unclear benefits + limited budget) = 3 points\n   • Very limited ROI (no clear pain + tiny budget) = 1-2 points ⚠️\n\nCATEGORY THRESHOLDS:\n• HOT: 70-100 points (Immediate pursuit)\n• WARM: 40-69 points (Schedule demo/nurture)\n• COLD: 0-39 points (Educational only)\n\nLEAD DATA:\n{{ JSON.stringify($('AI Council: Data Extractor').item.json.output) }}\n\nRESEARCH:\n{{ JSON.stringify($('AI Council: Research Agent').item.json.output) }}\n\nProvide final scoring and strategy.\n\nSCORING GUIDELINES:\n- A lead with \"$50-100/month\" budget should score 3-5 on budget (very limited)\n- A lead with \"6-12 months\" + \"just gathering info\" should score 3-5 on urgency\n- A lead with \"curious about\" + \"no specific plans\" should score 5-8 on fit\n- Total score under 40 = COLD lead (educational nurture only)\n\nCRITICAL: Return ONLY valid JSON. No markdown, no explanations.\n\nFormat:\n{\n  \"score\": 20,\n  \"category\": \"COLD\",\n  \"score_breakdown\": {\n    \"budget\": 5,\n    \"urgency\": 5,\n    \"fit\": 8,\n    \"roi_potential\": 2\n  },\n  \"next_action\": \"Add to educational nurture sequence. Provide entry-level automation tools information via email. Re-qualify in 6 months. NO active sales pursuit.\",\n  \"estimated_roi\": \"Very limited ROI potential. Budget of $50-100/month allows only basic tools. No immediate pain points or timeline. Research phase only. Recommend passive nurture with educational content and re-assess in Q3 2026.\"\n}\n"
+        }
+      },
+      "id": "6099ccc9-802c-405b-95d9-3291d5c1f5df",
+      "name": "AI Council: Decision Maker",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.6,
+      "position": [
+        -752,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================\n// UNIVERSAL LEAD MERGER - Works for HOT/WARM/COLD\n// ============================================\n\n// Helper function to safely parse any output format\nfunction safeParseOutput(output, fallback = {}) {\n  try {\n    // If already an object, return it\n    if (typeof output === 'object' && output !== null) {\n      return output;\n    }\n    \n    // If string, clean and parse\n    if (typeof output === 'string') {\n      // Remove markdown code blocks\n      let cleaned = output\n        .replace(/```json\\n?/g, '')\n        .replace(/```\\n?/g, '')\n        .trim();\n      \n      // Parse JSON\n      return JSON.parse(cleaned);\n    }\n    \n    return fallback;\n  } catch (e) {\n    console.error('Parse error:', e.message);\n    return fallback;\n  }\n}\n\n// Extract outputs from all agents\nconst extracted = safeParseOutput(\n  $('AI Council: Data Extractor').item.json.output,\n  {}\n);\n\nconst decision = safeParseOutput(\n  $('AI Council: Decision Maker').item.json.output,\n  {\n    score: 0,\n    category: 'UNKNOWN',\n    score_breakdown: {},\n    next_action: 'Manual review required',\n    estimated_roi: 'Not calculated'\n  }\n);\n\nconst research = safeParseOutput(\n  $('AI Council: Research Agent').item.json.output,\n  {\n    industry_trends: [],\n    automation_opportunities: [],\n    recommended_solutions: []\n  }\n);\n\n// ============================================\n// UNIVERSAL LEAD OBJECT - ALL LEAD TYPES\n// ============================================\n\nconst mergedLead = {\n  // ========== BASIC CONTACT INFO ==========\n  name: extracted.name || 'Unknown',\n  email: extracted.email || '',\n  phone: extracted.phone || 'Not provided',\n  company: extracted.company || '',\n  industry: extracted.industry || '',\n  \n  // ========== BUSINESS CONTEXT ==========\n  goal: extracted.goal || '',\n  budget: extracted.budget_indicator || extracted.budget || '',\n  urgency: extracted.urgency_level || 'unknown',\n  message_summary: extracted.message_summary || '',\n  \n  // ========== LEAD SCORING ==========\n  score: decision.score || 0,\n  category: decision.category || 'UNKNOWN',\n  score_breakdown: decision.score_breakdown || {\n    budget: 0,\n    urgency: 0,\n    fit: 0,\n    roi_potential: 0\n  },\n  \n  // ========== RECOMMENDATIONS ==========\n  next_action: decision.next_action || '',\n  estimated_roi: decision.estimated_roi || '',\n  \n  // ========== RESEARCH INSIGHTS ==========\n  industry_trends: research.industry_trends || [],\n  automation_opportunities: research.automation_opportunities || [],\n  recommended_solutions: research.recommended_solutions || [],\n  competitor_activity: research.competitor_activity || 'Not analyzed',\n  \n  // ========== METADATA ==========\n  correlation_id: `LEAD-${Date.now()}`,\n  timestamp: new Date().toISOString(),\n  session_id: $('Chat Trigger').first().json.sessionId || 'unknown',\n  workflow_generated: 'Yes',\n  source: 'n8n AI Lead System'\n};\n\n// ============================================\n// DYNAMIC FOLLOW-UP SCHEDULE (by temperature)\n// ============================================\n\nlet followUpSchedule = [];\nlet priority = 'medium';\nlet urgencyTag = '';\n\nif (mergedLead.score >= 70) {\n  // HOT LEAD\n  followUpSchedule = [1, 3, 7];\n  priority = 'urgent';\n  urgencyTag = '🔥 HOT';\n  mergedLead.sales_action = 'Schedule discovery call within 4 hours';\n  mergedLead.email_type = 'sales_focused';\n  \n} else if (mergedLead.score >= 40 && mergedLead.score < 70) {\n  // WARM LEAD\n  followUpSchedule = [2, 5, 10, 20];\n  priority = 'high';\n  urgencyTag = '🌡️ WARM';\n  mergedLead.sales_action = 'Schedule demo within 1 week';\n  mergedLead.email_type = 'educational_sales_mix';\n  \n} else {\n  // COLD LEAD\n  followUpSchedule = [7, 14, 30, 90];\n  priority = 'low';\n  urgencyTag = '❄️ COLD';\n  mergedLead.sales_action = 'Educational nurture only - no active pursuit';\n  mergedLead.email_type = 'educational_only';\n}\n\nmergedLead.follow_up_schedule = followUpSchedule;\nmergedLead.priority = priority;\nmergedLead.urgency_tag = urgencyTag;\n\n// ============================================\n// RETURN COMPLETE LEAD OBJECT\n// ============================================\n\nreturn mergedLead;\n"
+      },
+      "id": "6295efd7-5b13-4856-b49e-9d026f93b83b",
+      "name": "Merge Council Outputs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "hot",
+                    "leftValue": "={{ $json.score }}",
+                    "rightValue": 70,
+                    "operator": {
+                      "type": "number",
+                      "operation": "gte"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Hot Lead"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "warm",
+                    "leftValue": "={{ $json.score }}",
+                    "rightValue": 50,
+                    "operator": {
+                      "type": "number",
+                      "operation": "gte"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Warm Lead"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cold",
+                    "leftValue": "={{ $json.score }}",
+                    "rightValue": 50,
+                    "operator": {
+                      "type": "number",
+                      "operation": "lt"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Cold Lead"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3ca6f7f9-514c-45c7-969e-62aa6dace01b",
+      "name": "Route by AI Score",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        -272,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "search",
+        "limit": 1,
+        "filterGroupsUi": {
+          "filterGroupsValues": [
+            {
+              "filtersUi": {
+                "filterValues": [
+                  {
+                    "propertyName": "email|string",
+                    "value": "={{ $json.email }}"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "query": "={{ $json.email }}"
+        }
+      },
+      "id": "9dfd1694-8ae2-431d-b5be-ee2757d41408",
+      "name": "Search HubSpot",
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        -32,
+        112
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "2gxw6JCewyhvRYRR",
+          "name": "HubSpot account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "exists",
+              "leftValue": "={{ $json.id }}",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "841c2776-5a6d-48fa-934d-c4ce2e0f143f",
+      "name": "Contact Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        192,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "email": "={{ $('Route by AI Score').item.json.email }}",
+        "additionalFields": {
+          "firstName": "={{ $('Route by AI Score').item.json.name.split(' ')[0] }}",
+          "lastName": "={{ $('Route by AI Score').item.json.name.split(' ').slice(1).join(' ') || '' }}"
+        },
+        "options": {}
+      },
+      "id": "5c63c8e7-5d7f-4f5c-8dd8-c19ab8a90832",
+      "name": "Create HubSpot Contact",
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        416,
+        0
+      ],
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "2gxw6JCewyhvRYRR",
+          "name": "HubSpot account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "email": "={{ $('Search HubSpot').item.json.properties.email }}",
+        "additionalFields": {},
+        "options": {}
+      },
+      "id": "3e159278-46a0-40b7-8beb-b427bf239004",
+      "name": "Update HubSpot Contact",
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        416,
+        208
+      ],
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "2gxw6JCewyhvRYRR",
+          "name": "HubSpot account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "deal",
+        "stage": "qualifiedtobuy",
+        "additionalFields": {
+          "amount": "={{ $json.budget_avg }}",
+          "dealName": "=AI Lead - {{ $('Route by AI Score').item.json.name }} (Score: {{ $('Route by AI Score').item.json.lead_score }})",
+          "pipeline": "default"
+        }
+      },
+      "id": "ed2ae81f-682a-49c9-bdd0-c81f777698d7",
+      "name": "Create HubSpot Deal",
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        128
+      ],
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "2gxw6JCewyhvRYRR",
+          "name": "HubSpot account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================\n// DYNAMIC WORKFLOW GENERATION - BULLETPROOF VERSION\n// Handles all edge cases and missing data\n// ============================================\n\n// Get lead data with fallback\nconst lead = $('Route by AI Score').item.json || {};\n\n// Safe data extraction with defaults\nconst correlation_id = lead.correlation_id || `LEAD-${Date.now()}`;\nconst name = lead.name || 'Unknown Lead';\nconst email = lead.email || 'no-email@provided.com';\nconst company = lead.company || 'Unknown Company';\nconst industry = lead.industry || 'general';\nconst budget = lead.budget || 'Not specified';\nconst urgency = lead.urgency || 'low';\nconst goal = lead.goal || 'No specific goal provided';\nconst phone = lead.phone || 'Not provided';\n\n// Safe score extraction\nconst lead_score = lead.score || lead.lead_score || 0;\nconst category = (lead.category || lead.score_category || 'UNKNOWN').toUpperCase();\nconst urgency_tag = lead.urgency_tag || (lead_score >= 70 ? '🔥 HOT' : (lead_score >= 40 ? '🌡️ WARM' : '❄️ COLD'));\n\n// Safe research data extraction\nconst research = lead.research || {};\nconst estimated_roi = research.estimated_roi || lead.estimated_roi || 'Not calculated';\nconst automation_opportunities = research.automation_opportunities || [];\nconst recommended_solutions = research.recommended_solutions || [];\nconst industry_trends = research.industry_trends || [];\n\n// Safe score breakdown\nconst score_breakdown = lead.score_breakdown || {\n  budget: 0,\n  urgency: 0,\n  fit: 0,\n  roi_potential: 0\n};\n\n// Generate follow-up schedule based on score\nconst followUpDays = lead_score >= 70 ? [1, 3, 7] : (lead_score >= 40 ? [2, 5, 10, 14] : [7, 14, 30, 90]);\n\n// Determine priority\nconst priority = lead_score >= 70 ? 'urgent' : (lead_score >= 40 ? 'high' : 'low');\n\n// Determine sales action\nlet sales_action = '';\nlet email_type = '';\n\nif (lead_score >= 70) {\n  sales_action = 'Schedule discovery call within 4 hours. High-priority immediate outreach.';\n  email_type = 'sales_focused';\n} else if (lead_score >= 40) {\n  sales_action = 'Send case studies and schedule demo. Nurture with educational content.';\n  email_type = 'educational_sales';\n} else {\n  sales_action = 'Educational nurture only - no active pursuit. Add to newsletter sequence.';\n  email_type = 'educational_only';\n}\n\n// Determine next action\nlet next_action = '';\nif (lead_score >= 70) {\n  next_action = 'IMMEDIATE: Call within 4 hours. Send personalized pitch. Create HubSpot deal.';\n} else if (lead_score >= 40) {\n  next_action = 'Schedule demo call within 1 week. Send educational resources. Add to CRM.';\n} else {\n  next_action = 'Add to educational nurture sequence. Provide entry-level automation tools information via email. Re-qualify in 6 months. NO active sales pursuit.';\n}\n\n// Generate dynamic workflow snippet\nconst workflowSnippet = {\n  meta: {\n    generated_by: \"Aonxi AI Council\",\n    generated_at: new Date().toISOString(),\n    for_lead: correlation_id,\n    lead_score: lead_score,\n    approval_required: lead_score >= 70\n  },\n  workflow: {\n    name: `Follow-up: ${name} (${category})`,\n    description: `AI-generated nurture sequence for ${category} lead`,\n    trigger: {\n      type: \"webhook\",\n      path: `/follow-up/${correlation_id}`,\n      description: \"Triggered after initial email sent\"\n    },\n    nodes: followUpDays.map((day, index) => ({\n      id: `day${day}-action`,\n      type: \"schedule\",\n      wait_days: day,\n      action: index === 0 ? \"check_email_engagement\" : (index === 1 ? \"send_case_study\" : \"human_outreach\"),\n      condition: index === 0 ? \"if_email_opened\" : \"if_no_response\",\n      details: {\n        email_template: recommended_solutions[index] || \"General follow-up\",\n        escalation: index === followUpDays.length - 1 ? \"slack_alert_sales_team\" : \"none\"\n      }\n    })),\n    automation_opportunities: automation_opportunities,\n    estimated_conversion_lift: lead_score >= 70 ? \"40-50%\" : (lead_score >= 40 ? \"25-35%\" : \"10-20%\"),\n    recommended_tools: [\n      \"Gmail for email outreach\",\n      \"HubSpot for CRM sync\",\n      \"Slack for team notifications\",\n      \"n8n for workflow execution\"\n    ]\n  },\n  deployment: {\n    ready_to_deploy: lead_score >= 70,\n    requires_review: lead_score < 70,\n    deployment_url: `https://n8n.aonxi.com/workflow/follow-up-${correlation_id}`\n  }\n};\n\n// Return complete structured data\nreturn {\n  json: {\n    // Core identification\n    correlation_id: correlation_id,\n    session_id: lead.session_id || `SESSION-${Date.now()}`,\n    \n    // Contact details\n    name: name,\n    email: email,\n    phone: phone,\n    company: company,\n    industry: industry,\n    \n    // Business context\n    goal: goal,\n    budget: budget,\n    urgency: urgency,\n    message_summary: lead.message_summary || `${category} lead from ${company}`,\n    \n    // Scoring\n    score: lead_score,\n    category: category,\n    urgency_tag: urgency_tag,\n    score_breakdown: score_breakdown,\n    \n    // Strategy\n    next_action: next_action,\n    estimated_roi: estimated_roi,\n    sales_action: sales_action,\n    email_type: email_type,\n    priority: priority,\n    \n    // Follow-up\n    follow_up_schedule: followUpDays,\n    \n    // Research insights\n    industry_trends: industry_trends,\n    automation_opportunities: automation_opportunities,\n    recommended_solutions: recommended_solutions,\n    \n    // Workflow generation\n    dynamic_workflow_snippet: workflowSnippet,\n    workflow_ready: lead_score >= 70,\n    workflow_summary: `${category} lead: ${followUpDays.length} touchpoints over ${Math.max(...followUpDays)} days`,\n    workflow_generated: 'Yes',\n    \n    // Metadata\n    source: 'n8n AI Lead System',\n    generated_at: new Date().toISOString()\n  }\n};\n"
+      },
+      "id": "117c48c4-bd02-4f58-b5e5-b42c522444ec",
+      "name": "Generate Dynamic Workflow",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1408,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://mockapi.io/directory/submit",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "=Name",
+              "value": "={{ $('Generate Dynamic Workflow').item.json.name }}"
+            },
+            {
+              "name": "email",
+              "value": "={{ $('Generate Dynamic Workflow').item.json.email }}"
+            },
+            {
+              "name": "company",
+              "value": "={{ $('Generate Dynamic Workflow').item.json.company }}"
+            },
+            {
+              "name": "industry",
+              "value": "={{ $('Generate Dynamic Workflow').item.json.industry }}"
+            },
+            {
+              "name": "lead_score",
+              "value": "={{ $('Generate Dynamic Workflow').item.json.lead_score }}"
+            },
+            {
+              "name": "score_category",
+              "value": "={{ $('Generate Dynamic Workflow').item.json.score_category }}"
+            },
+            {
+              "name": "budget",
+              "value": "={{ $('Generate Dynamic Workflow').item.json.budget_indicator }}"
+            },
+            {
+              "name": "urgency",
+              "value": "={{ $('Generate Dynamic Workflow').item.json.urgency_level }}"
+            },
+            {
+              "name": "correlation_id",
+              "value": "={{ $('Generate Dynamic Workflow').item.json.correlation_id }}"
+            },
+            {
+              "name": "submission_date",
+              "value": "={{ $now.toISO() }}"
+            },
+            {
+              "name": "source",
+              "value": "Aonxi AI Lead System"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1ca5065a-cb47-4f2c-87ec-3dc2fdb384a5",
+      "name": "Organic Growth: Directory Submit",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        704,
+        608
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0A8P72DN79",
+          "mode": "list",
+          "cachedResultName": "social"
+        },
+        "text": "=🔥🔥🔥 *HOT LEAD ALERT* 🔥🔥🔥\n\nNew qualified lead scored *{{ $json.score }}/100*\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n👤 *CONTACT DETAILS:*\n• *Name:* {{ $json.name }}\n• *Email:* {{ $json.email }}\n• *Phone:* {{ $json.phone }}\n• *Company:* {{ $json.company }}\n• *Industry:* {{ $json.industry }}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n💰 *OPPORTUNITY:*\n• *Budget:* {{ $json.budget }}\n• *Urgency:* {{ $json.urgency }}\n• *Category:* *{{ $json.category }} LEAD* {{ $json.urgency_tag }}\n• *Score:* {{ $json.score }}/100\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n🎯 *GOAL:*\n{{ $json.goal }}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n🤖 *AI ASSESSMENT:*\n{{ $json.estimated_roi }}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n📊 *SCORE BREAKDOWN:*\n• Budget: {{ $json.score_breakdown.budget }}/30\n• Urgency: {{ $json.score_breakdown.urgency }}/30\n• Fit: {{ $json.score_breakdown.fit }}/30\n• ROI Potential: {{ $json.score_breakdown.roi_potential }}/10\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n✅ *ACTIONS COMPLETED:*\n• ✓ Lead Qualified & Scored ({{ $json.score }}/100)\n• ✓ Email Sent to Prospect\n• ✓ HubSpot Contact & Deal Created\n• ✓ Auto Follow-up Scheduled: Days {{ $json.follow_up_schedule.join(', ') }}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n⚡ *IMMEDIATE NEXT STEPS:*\n{{ $json.next_action }}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n🔗 *QUICK ACCESS:*\n• Email: {{ $json.email }}\n• Budget: {{ $json.budget }}\n• Priority: {{ $json.priority }}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n🚨 *ACTION REQUIRED:* {{ $json.sales_action }}\n\n_Lead ID: {{ $json.correlation_id }}_\n_Generated: {{ $json.generated_at }}_\n_Session: {{ $json.session_id }}_\n",
+        "otherOptions": {}
+      },
+      "id": "bb7cb8ce-35fb-44c0-9d6d-9697c9720c32",
+      "name": "Hot Lead: Human Escalation",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        1728,
+        0
+      ],
+      "webhookId": "b568e54b-8c85-42c8-8db9-6346a2ce7c0f",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "NoAbggusCS8ELT8r",
+          "name": "Slack account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0A8P72DN79",
+          "mode": "list",
+          "cachedResultName": "social"
+        },
+        "text": "=🌡️🌡️ *WARM LEAD NOTIFICATION* 🌡️🌡️\n\n*Lead Score:* {{ $json.score }}/100 (WARM) 🌡️\n\n*CONTACT DETAILS:*\n• *Name:* {{ $json.name }}\n• *Email:* {{ $json.email }}\n• *Phone:* {{ $json.phone }}\n• *Company:* {{ $json.company }}\n• *Industry:* {{ $json.industry }}\n\n*QUALIFICATION:*\n• *Budget:* {{ $json.budget }} ⚠️\n• *Urgency:* {{ $json.urgency }} ⏰\n• *Goal:* {{ $json.goal }}\n\n*SCORE BREAKDOWN:*\n• Budget: {{ $json.score_breakdown.budget }}/30 💰\n• Urgency: {{ $json.score_breakdown.urgency }}/30 🏃\n• Fit: {{ $json.score_breakdown.fit }}/30 🎯\n• ROI Potential: {{ $json.score_breakdown.roi_potential }}/10 📈\n\n*RECOMMENDED ACTION:*\n{{ $json.next_action }}\n\n*ESTIMATED ROI:*\n{{ $json.estimated_roi }}\n\n*NEXT STEPS:*\n1. Send educational email with case studies\n2. Provide ROI calculator and resources\n3. Schedule demo call (2-3 weeks)\n4. Create HubSpot deal (Qualified stage)\n5. Add to nurture campaign\n\n*Bot Profile:* {{ $json.source }}\n\n*Correlation ID:* {{ $json.correlation_id }}\n",
+        "otherOptions": {}
+      },
+      "id": "078daeed-2205-4206-b414-941de9a3ea90",
+      "name": "Warm Lead Notification",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1728,
+        272
+      ],
+      "webhookId": "b05f40a1-3715-4c3a-aec3-2f4546c10c8e",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "NoAbggusCS8ELT8r",
+          "name": "Slack account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0A8P72DN79",
+          "mode": "list",
+          "cachedResultName": "social"
+        },
+        "text": "=❄️ *COLD LEAD ALERT* ❄️\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n*Lead Score:* {{ $json.score }}/100 (COLD)\n\n👤 *CONTACT DETAILS*\n• Name: {{ $json.name }}\n• Email: {{ $json.email }}\n• Phone: {{ $json.phone }}\n• Company: {{ $json.company }}\n• Industry: {{ $json.industry }}\n\n💰 *QUALIFICATION*\n• Budget: {{ $json.budget }}\n• Urgency: {{ $json.urgency }}\n• Timeline: 6-12+ months\n\n📊 *SCORE BREAKDOWN*\n• Budget: {{ $json.score_breakdown.budget }}/30\n• Urgency: {{ $json.score_breakdown.urgency }}/30\n• Fit: {{ $json.score_breakdown.fit }}/30\n• ROI: {{ $json.score_breakdown.roi_potential }}/10\n\n🎯 *RECOMMENDED ACTION*\n{{ $json.next_action }}\n\n📅 *FOLLOW-UP SCHEDULE*\n• Day 7: Educational email #1\n• Day 14: Case study\n• Day 30: Check-in email\n• Day 90: Re-qualification\n\n⚠️ *PRIORITY:* 🟦 LOW - Educational nurture only\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nLead ID: {{ $json.correlation_id }}\nTimestamp: {{ $json.timestamp }}\n",
+        "otherOptions": {}
+      },
+      "id": "95d80e1e-b194-466c-9143-985f8d89ffc2",
+      "name": "Cold Lead Log",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1520,
+        528
+      ],
+      "webhookId": "b5bd9b1b-5250-452e-abff-258d57e5aa16",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "NoAbggusCS8ELT8r",
+          "name": "Slack account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1MdKoKZRMWP97ERQhPzmp0LT88f9NTx71cgQYmZu_9sA",
+          "mode": "list",
+          "cachedResultName": "aa",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1MdKoKZRMWP97ERQhPzmp0LT88f9NTx71cgQYmZu_9sA/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 378778648,
+          "mode": "list",
+          "cachedResultName": "aonxi_leads_sheet",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1MdKoKZRMWP97ERQhPzmp0LT88f9NTx71cgQYmZu_9sA/edit#gid=378778648"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ $now.toISO() }}",
+            "correlation_id": "={{ $('Generate Dynamic Workflow').item.json.correlation_id }}",
+            "name": "={{ $('Generate Dynamic Workflow').item.json.name }}",
+            "email": "={{ $('Generate Dynamic Workflow').item.json.email }}",
+            "phone": "={{ $('Generate Dynamic Workflow').item.json.phone }}",
+            "company": "={{ $('Generate Dynamic Workflow').item.json.company }}",
+            "industry": "={{ $('Generate Dynamic Workflow').item.json.industry }}",
+            "goal": "={{ $('Generate Dynamic Workflow').item.json.goal }}",
+            "budget": "={{ $('Generate Dynamic Workflow').item.json.budget }}",
+            "urgency": "={{ $('Generate Dynamic Workflow').item.json.urgency }}",
+            "score": "={{ $('Generate Dynamic Workflow').item.json.score }}",
+            "category": "={{ $('Generate Dynamic Workflow').item.json.category }}",
+            "next_action": "={{ $('Generate Dynamic Workflow').item.json.next_action }}",
+            "estimated_roi": "={{ $('Generate Dynamic Workflow').item.json.estimated_roi }}",
+            "workflow_generated": "={{ $('Generate Dynamic Workflow').item.json.workflow_ready ? 'Yes' : 'No' }}",
+            "source": "n8n AI Lead System"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "correlation_id",
+              "displayName": "correlation_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "company",
+              "displayName": "company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "industry",
+              "displayName": "industry",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "goal",
+              "displayName": "goal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "budget",
+              "displayName": "budget",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "urgency",
+              "displayName": "urgency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "next_action",
+              "displayName": "next_action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estimated_roi",
+              "displayName": "estimated_roi",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "workflow_generated",
+              "displayName": "workflow_generated",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "951b9811-c6ce-4f77-8c88-09379fc181c2",
+      "name": "Track Metrics in Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        2128,
+        48
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "RANXeci3f1kL5ITz",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.0-flash",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -1792,
+        480
+      ],
+      "id": "5377997f-7dab-49d2-b80f-8a542eeeaa19",
+      "name": "Google Gemini Chat Model1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "wfIlFenlaqS7dHbG",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -1248,
+        576
+      ],
+      "id": "8bb094e2-9a81-44b9-acfd-1e826defa49f",
+      "name": "Google Gemini Chat Model2",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "wfIlFenlaqS7dHbG",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -752,
+        624
+      ],
+      "id": "ae092151-a211-4a3b-9322-fd20157f45de",
+      "name": "Google Gemini Chat Model3",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "wfIlFenlaqS7dHbG",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Code in JavaScript1').item.json.contact_email }}",
+        "subject": "={{ $('Code in JavaScript1').item.json.contact_firstname }}, let's automate your lead qualification for {{ $('Code in JavaScript1').item.json.company }}",
+        "message": "=<div style=\"font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto;\">\n  \n  <h2 style=\"color: #0066cc;\">Hi {{ $('Code in JavaScript1').item.json.contact_firstname }}! 👋</h2>\n  \n  <p>Thank you for your interest in automating lead qualification for <strong>{{ $('Code in JavaScript1').item.json.company }}</strong>!</p>\n  \n  <p>Based on your inquiry, I can see you're looking to:</p>\n  <ul style=\"background-color: #f5f5f5; padding: 20px; border-left: 4px solid #0066cc;\">\n    <li>✅ Reduce manual lead qualification time by <strong>70%</strong></li>\n    <li>✅ Increase lead-to-deal conversion from <strong>8% to 15%</strong></li>\n    <li>✅ Implement AI-driven lead scoring and routing</li>\n    <li>✅ Set up personalized follow-up sequences</li>\n  </ul>\n  \n  <div style=\"background-color: #e8f4f8; padding: 20px; border-radius: 8px; margin: 20px 0;\">\n    <h3 style=\"color: #0066cc; margin-top: 0;\">💰 Budget: ${{ $('Code in JavaScript1').item.json.budget_avg }}</h3>\n    <p>With your budget, we can build a comprehensive AI automation solution tailored to your SaaS company.</p>\n  </div>\n  \n  <div style=\"background-color: #fff3cd; padding: 15px; border-radius: 8px; border-left: 4px solid #ff9800; margin: 20px 0;\">\n    <h3 style=\"color: #ff6600; margin-top: 0;\">🔥 Your Lead Score: {{ $('Code in JavaScript1').item.json.lead_score }}/100</h3>\n    <p style=\"margin: 0;\"><strong>Category:</strong> {{ $('Code in JavaScript1').item.json.score_category }} Lead - You're a top priority!</p>\n  </div>\n  \n  <p>We've created a deal for you in our system and assigned a dedicated account manager.</p>\n  \n  <div style=\"background-color: #f0f0f0; padding: 20px; border-radius: 8px; margin: 20px 0;\">\n    <h3 style=\"color: #0066cc; margin-top: 0;\">📋 Next Steps:</h3>\n    <ol style=\"margin: 0;\">\n      <li><strong>Schedule Discovery Call:</strong> Let's meet within the next 2 business days</li>\n      <li><strong>Process Analysis:</strong> We'll analyze your current lead qualification workflow</li>\n      <li><strong>Custom Blueprint:</strong> Create an automation roadmap for your team</li>\n      <li><strong>Quick Win Demo:</strong> Show immediate value with a pilot automation</li>\n    </ol>\n  </div>\n  \n  <div style=\"text-align: center; margin: 30px 0;\">\n    <a href=\"https://calendly.com/aonxi-ai/discovery\" style=\"background-color: #0066cc; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;\">📅 Book Discovery Call</a>\n  </div>\n  \n  <div style=\"background-color: #e8f4f8; padding: 20px; border-radius: 8px; margin: 20px 0;\">\n    <h3 style=\"color: #0066cc; margin-top: 0;\">🎯 What You'll Get:</h3>\n    <ul style=\"margin: 0;\">\n      <li>AI-powered lead scoring (0-100 scale)</li>\n      <li>Automated lead routing to the right sales reps</li>\n      <li>Personalized email sequences</li>\n      <li>HubSpot integration with custom workflows</li>\n      <li>Real-time Slack notifications</li>\n      <li>Google Sheets tracking and reporting</li>\n    </ul>\n  </div>\n  \n  <p><strong>Expected ROI:</strong> Reduce 3-4 hours of daily manual work by 70%, saving considerable time and costs. Plus, increase revenue by boosting conversion rates from 8% to 15%!</p>\n  \n  <hr style=\"border: none; border-top: 1px solid #ddd; margin: 30px 0;\">\n  \n  <p>Looking forward to transforming your lead qualification process!</p>\n  \n  <p style=\"margin-top: 30px;\">\n    <strong>Best regards,</strong><br>\n    <span style=\"color: #0066cc; font-size: 18px; font-weight: bold;\">Aonxi AI Automation Team</span><br>\n    📧 hello@aonxi.ai<br>\n    🌐 <a href=\"https://aonxi.ai\" style=\"color: #0066cc;\">aonxi.ai</a><br>\n    📱 +1 (555) 123-4567\n  </p>\n  \n  <div style=\"background-color: #f5f5f5; padding: 15px; border-radius: 8px; margin-top: 30px; font-size: 12px; color: #777;\">\n    <p style=\"margin: 0;\"><strong>Contact ID:</strong> {{ $('Code in JavaScript1').item.json.contact_id }}</p>\n    <p style=\"margin: 5px 0 0 0;\"><strong>Lead Correlation ID:</strong> {{ $('Code in JavaScript1').item.json.correlation_id }}</p>\n  </div>\n  \n</div>\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1168,
+        128
+      ],
+      "id": "c803cc27-6643-4ff8-ac81-00bbab2ecba5",
+      "name": "Send a message",
+      "webhookId": "c19cdc3a-cff6-4244-a675-65ab35ad1666",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "lZbIgVukYery9gIW",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3208ec8e-5eb1-4e99-a4d5-2597638266f9",
+              "name": "fullConversation",
+              "value": "={{ $('Qualification Agent').item.json.output }}",
+              "type": "string"
+            },
+            {
+              "id": "6bbac583-d48d-49c3-8d88-80bb7e48a9ad",
+              "name": "chatHistory",
+              "value": "={{ $('Chat Trigger').all().map(item => item.json.chatInput).join(' | ') }}",
+              "type": "string"
+            },
+            {
+              "id": "b98b876a-de6f-4be0-8299-50e3279b1ab6",
+              "name": "sessionId",
+              "value": "={{ $('Chat Trigger').item.json.sessionId }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1648,
+        176
+      ],
+      "id": "fe3b4ef5-a443-4d07-a48d-1336e1d559ea",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the lead data from Route by AI Score\nconst leadData = $('Route by AI Score').item.json;\n\n// Parse budget: \"$30k-$50k\" → { min: 30000, max: 50000, avg: 40000 }\nfunction parseBudget(budgetString) {\n  if (!budgetString) return { min: 0, max: 0, avg: 0 };\n  \n  // Remove $ and other non-numeric characters except k, m, and -\n  const numbers = budgetString.match(/\\d+/g);\n  \n  if (!numbers || numbers.length === 0) return { min: 0, max: 0, avg: 0 };\n  \n  // Convert to actual numbers (handle k for thousands)\n  const parseValue = (val) => {\n    const num = parseInt(val);\n    if (budgetString.toLowerCase().includes('k')) return num * 1000;\n    if (budgetString.toLowerCase().includes('m')) return num * 1000000;\n    return num;\n  };\n  \n  const min = parseValue(numbers[0]);\n  const max = numbers.length > 1 ? parseValue(numbers[1]) : min;\n  const avg = Math.round((min + max) / 2);\n  \n  return { min, max, avg };\n}\n\n// Parse the budget\nconst budget = parseBudget(leadData.budget_indicator);\n\n// Return enhanced data\nreturn [{\n  json: {\n    ...leadData,\n    // Original text budget\n    budget_text: leadData.budget_indicator,\n    \n    // Parsed numeric values\n    budget_min: budget.min,\n    budget_max: budget.max,\n    budget_avg: budget.avg,\n    \n    // Contact ID from previous node\n    contact_id: $('Create HubSpot Contact').item.json.vid\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        480
+      ],
+      "id": "14a6abaf-c21c-458c-adcc-6effb6cc756c",
+      "name": "Parse Lead Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the lead data from Route by AI Score or Merge Council Outputs\nconst leadData = $('Route by AI Score').item.json || $('Merge Council Outputs').item.json;\n\n// Parse budget: \"$30k-$50k\" → { min: 30000, max: 50000, avg: 40000 }\n// Also handles: \"$40,000\" → { min: 40000, max: 40000, avg: 40000 }\nfunction parseBudget(budgetString) {\n  if (!budgetString) return { min: 0, max: 0, avg: 0 };\n  \n  // Remove all non-numeric characters EXCEPT digits, k, m, and hyphen\n  // This removes $, commas, spaces, etc.\n  const cleaned = budgetString.replace(/[^0-9kmKM\\-]/g, '');\n  \n  // Split by hyphen to get range (e.g., \"30k-50k\" → [\"30k\", \"50k\"])\n  const parts = cleaned.split('-').filter(p => p.length > 0);\n  \n  // Convert a value like \"40k\" or \"2m\" or \"40000\" to a number\n  const parseValue = (val) => {\n    if (!val) return 0;\n    \n    const lowerVal = val.toLowerCase();\n    \n    // Extract the number part\n    const numMatch = lowerVal.match(/\\d+/);\n    if (!numMatch) return 0;\n    \n    const num = parseInt(numMatch[0]);\n    \n    // Apply multiplier\n    if (lowerVal.includes('m')) return num * 1000000;\n    if (lowerVal.includes('k')) return num * 1000;\n    return num;\n  };\n  \n  // Parse min and max\n  const min = parseValue(parts[0]);\n  const max = parts.length > 1 ? parseValue(parts[1]) : min;\n  const avg = Math.round((min + max) / 2);\n  \n  return { min, max, avg };\n}\n\n// Parse the budget\nconst budget = parseBudget(leadData.budget_indicator);\n\n// Get contact ID from Update HubSpot Contact (handles both create and update)\nconst contactId = $('Update HubSpot Contact').item.json.vid || \n                  $('Update HubSpot Contact').item.json['canonical-vid'] ||\n                  null;\n\n// Return enhanced data\nreturn [{\n  json: {\n    ...leadData,\n    // Original text budget\n    budget_text: leadData.budget_indicator,\n    \n    // Parsed numeric values\n    budget_min: budget.min,\n    budget_max: budget.max,\n    budget_avg: budget.avg,\n    \n    // Contact ID from previous node\n    contact_id: contactId,\n    \n    // Parsed timestamp\n    parsed_at: new Date().toISOString()\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        368,
+        624
+      ],
+      "id": "b5f496f2-afce-4cee-9ab6-d14613fec8fd",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================\n// Parse Lead Data - Works for BOTH paths!\n// ============================================\n\n// Get lead data from Route by AI Score or Merge Council Outputs\nconst leadData = $('Route by AI Score').item.json || $('Merge Council Outputs').item.json;\n\n// Get contact data from EITHER Create or Update node (whichever executed)\nlet contactData = null;\nlet contactId = null;\n\n// Check if Create HubSpot Contact executed (new contact path)\nif ($('Create HubSpot Contact').isExecuted) {\n  contactData = $('Create HubSpot Contact').item.json;\n  contactId = contactData.vid || contactData['canonical-vid'];\n}\n// Check if Update HubSpot Contact executed (existing contact path)\nelse if ($('Update HubSpot Contact').isExecuted) {\n  contactData = $('Update HubSpot Contact').item.json;\n  contactId = contactData.vid || contactData['canonical-vid'];\n}\n\n// ============================================\n// Budget Parsing Function\n// ============================================\nfunction parseBudget(budgetString) {\n  if (!budgetString) return { min: 0, max: 0, avg: 0 };\n  \n  // Remove all non-numeric characters EXCEPT digits, k, m, and hyphen\n  // This removes $, commas, spaces, etc.\n  const cleaned = budgetString.replace(/[^0-9kmKM\\-]/g, '');\n  \n  // Split by hyphen to get range (e.g., \"30k-50k\" → [\"30k\", \"50k\"])\n  const parts = cleaned.split('-').filter(p => p.length > 0);\n  \n  // Convert a value like \"40k\" or \"2m\" or \"40000\" to a number\n  const parseValue = (val) => {\n    if (!val) return 0;\n    \n    const lowerVal = val.toLowerCase();\n    \n    // Extract the number part\n    const numMatch = lowerVal.match(/\\d+/);\n    if (!numMatch) return 0;\n    \n    const num = parseInt(numMatch[0]);\n    \n    // Apply multiplier\n    if (lowerVal.includes('m')) return num * 1000000;\n    if (lowerVal.includes('k')) return num * 1000;\n    return num;\n  };\n  \n  // Parse min and max\n  const min = parseValue(parts[0]);\n  const max = parts.length > 1 ? parseValue(parts[1]) : min;\n  const avg = Math.round((min + max) / 2);\n  \n  return { min, max, avg };\n}\n\n// Parse the budget\nconst budget = parseBudget(leadData.budget_indicator);\n\n// ============================================\n// Return enhanced data with all fields\n// ============================================\nreturn [{\n  json: {\n    // All original lead data\n    ...leadData,\n    \n    // Budget fields\n    budget_text: leadData.budget_indicator,\n    budget_min: budget.min,\n    budget_max: budget.max,\n    budget_avg: budget.avg,\n    \n    // Contact ID (from either create or update)\n    contact_id: contactId,\n    \n    // Contact info\n    contact_email: contactData?.properties?.email?.value || leadData.email,\n    contact_firstname: contactData?.properties?.firstname?.value || leadData.name?.split(' ')[0],\n    contact_lastname: contactData?.properties?.lastname?.value || leadData.name?.split(' ').slice(1).join(' '),\n    \n    // Metadata\n    path_taken: $('Create HubSpot Contact').isExecuted ? 'new_contact' : 'existing_contact',\n    parsed_at: new Date().toISOString()\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        128
+      ],
+      "id": "3035d6f0-452a-45f5-96d3-80d5de39b4c5",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -1920,
+        576
+      ],
+      "id": "03cfc405-4332-4331-bb25-b4d19ae0e4a8",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "Ufumpumol6x33k2e",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 15
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -1232,
+        272
+      ],
+      "id": "c78b580f-036b-49f8-bd21-b0db56390f38",
+      "name": "Wait",
+      "webhookId": "bc5e795b-2951-4cf8-bc03-9cbec0079c7f"
+    },
+    {
+      "parameters": {
+        "amount": 15
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -864,
+        272
+      ],
+      "id": "3691e694-af5e-42d7-81d0-a64162cbc1ff",
+      "name": "Wait1",
+      "webhookId": "bc5e795b-2951-4cf8-bc03-9cbec0079c7f"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1MdKoKZRMWP97ERQhPzmp0LT88f9NTx71cgQYmZu_9sA",
+          "mode": "list",
+          "cachedResultName": "aa",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1MdKoKZRMWP97ERQhPzmp0LT88f9NTx71cgQYmZu_9sA/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 378778648,
+          "mode": "list",
+          "cachedResultName": "aonxi_leads_sheet",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1MdKoKZRMWP97ERQhPzmp0LT88f9NTx71cgQYmZu_9sA/edit#gid=378778648"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ $now.toISO() }}",
+            "correlation_id": "={{ $('Merge Council Outputs').item.json.correlation_id }}",
+            "name": "={{ $('Merge Council Outputs').item.json.name }}",
+            "email": "={{ $('Merge Council Outputs').item.json.email }}",
+            "phone": "={{ $('Merge Council Outputs').item.json.phone }}",
+            "company": "={{ $('Merge Council Outputs').item.json.company }}",
+            "industry": "={{ $('Merge Council Outputs').item.json.industry }}",
+            "goal": "={{ $('Merge Council Outputs').item.json.goal }}",
+            "budget": "={{ $('Merge Council Outputs').item.json.budget }}",
+            "urgency": "={{ $('Merge Council Outputs').item.json.urgency }}",
+            "score": "={{ $('Merge Council Outputs').item.json.score }}",
+            "category": "={{ $('Merge Council Outputs').item.json.category }}",
+            "next_action": "={{ $('Merge Council Outputs').item.json.next_action }}",
+            "estimated_roi": "={{ $('Merge Council Outputs').item.json.estimated_roi }}",
+            "workflow_generated": "={{ $('Merge Council Outputs').item.json.workflow_generated }}",
+            "source": "n8n AI Lead System"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "correlation_id",
+              "displayName": "correlation_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "company",
+              "displayName": "company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "industry",
+              "displayName": "industry",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "goal",
+              "displayName": "goal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "budget",
+              "displayName": "budget",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "urgency",
+              "displayName": "urgency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "next_action",
+              "displayName": "next_action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estimated_roi",
+              "displayName": "estimated_roi",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "workflow_generated",
+              "displayName": "workflow_generated",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "1e9816f2-37ea-4feb-8af7-62434507d6b5",
+      "name": "Track Metrics in Sheets1",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        2096,
+        288
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "RANXeci3f1kL5ITz",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1MdKoKZRMWP97ERQhPzmp0LT88f9NTx71cgQYmZu_9sA",
+          "mode": "list",
+          "cachedResultName": "aa",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1MdKoKZRMWP97ERQhPzmp0LT88f9NTx71cgQYmZu_9sA/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 378778648,
+          "mode": "list",
+          "cachedResultName": "aonxi_leads_sheet",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1MdKoKZRMWP97ERQhPzmp0LT88f9NTx71cgQYmZu_9sA/edit#gid=378778648"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ $now.toISO() }}",
+            "correlation_id": "={{ $('Merge Council Outputs').item.json.correlation_id }}",
+            "name": "={{ $('Merge Council Outputs').item.json.name }}",
+            "email": "={{ $('Merge Council Outputs').item.json.email }}",
+            "phone": "={{ $('Merge Council Outputs').item.json.phone }}",
+            "company": "={{ $('Merge Council Outputs').item.json.company }}",
+            "industry": "={{ $('Merge Council Outputs').item.json.industry }}",
+            "goal": "={{ $('Merge Council Outputs').item.json.goal }}",
+            "budget": "={{ $('Merge Council Outputs').item.json.budget }}",
+            "urgency": "={{ $('Merge Council Outputs').item.json.urgency }}",
+            "score": "={{ $('Merge Council Outputs').item.json.score }}",
+            "category": "={{ $('Merge Council Outputs').item.json.category }}",
+            "next_action": "={{ $('Merge Council Outputs').item.json.next_action }}",
+            "estimated_roi": "={{ $('Merge Council Outputs').item.json.estimated_roi }}",
+            "workflow_generated": "={{ $('Merge Council Outputs').item.json.workflow_generated }}",
+            "source": "n8n AI Lead System"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "correlation_id",
+              "displayName": "correlation_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "company",
+              "displayName": "company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "industry",
+              "displayName": "industry",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "goal",
+              "displayName": "goal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "budget",
+              "displayName": "budget",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "urgency",
+              "displayName": "urgency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "next_action",
+              "displayName": "next_action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estimated_roi",
+              "displayName": "estimated_roi",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "workflow_generated",
+              "displayName": "workflow_generated",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "d16870a2-85b3-4608-8f93-f5ed433d3769",
+      "name": "Track Metrics in Sheets2",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        2096,
+        512
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "RANXeci3f1kL5ITz",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Chat Trigger": {
+      "main": [
+        [
+          {
+            "node": "Qualification Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qualification Agent": {
+      "main": [
+        [
+          {
+            "node": "Ready for Processing?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Qualification Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ready for Processing?": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Council: Data Extractor": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Council: Data Extractor",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Council: Research Agent": {
+      "main": [
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Research Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Council: Research Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Council: Decision Maker": {
+      "main": [
+        [
+          {
+            "node": "Merge Council Outputs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Council Outputs": {
+      "main": [
+        [
+          {
+            "node": "Route by AI Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by AI Score": {
+      "main": [
+        [
+          {
+            "node": "Search HubSpot",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Warm Lead Notification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Cold Lead Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search HubSpot": {
+      "main": [
+        [
+          {
+            "node": "Contact Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contact Exists?": {
+      "main": [
+        [
+          {
+            "node": "Update HubSpot Contact",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create HubSpot Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create HubSpot Contact": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update HubSpot Contact": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create HubSpot Deal": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Dynamic Workflow": {
+      "main": [
+        [
+          {
+            "node": "Hot Lead: Human Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Organic Growth: Directory Submit": {
+      "main": [
+        []
+      ]
+    },
+    "Hot Lead: Human Escalation": {
+      "main": [
+        [
+          {
+            "node": "Track Metrics in Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Warm Lead Notification": {
+      "main": [
+        [
+          {
+            "node": "Track Metrics in Sheets1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cold Lead Log": {
+      "main": [
+        [
+          {
+            "node": "Track Metrics in Sheets2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model1": {
+      "ai_languageModel": [
+        []
+      ]
+    },
+    "Google Gemini Chat Model2": {
+      "ai_languageModel": [
+        []
+      ]
+    },
+    "Google Gemini Chat Model3": {
+      "ai_languageModel": [
+        []
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Generate Dynamic Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "AI Council: Data Extractor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Lead Data": {
+      "main": [
+        []
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        []
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Create HubSpot Deal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Qualification Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "AI Council: Data Extractor",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "AI Council: Research Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "AI Council: Decision Maker",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "AI Council: Research Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait1": {
+      "main": [
+        [
+          {
+            "node": "AI Council: Decision Maker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "cff26b3c-bdf0-4d96-8a01-69eba8738865",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "09d108e472cbb548be7c98a9cd0c301ac07177400fc615e9faf8fa03fe0892de"
+  },
+  "id": "5NbI11lqH1B046dS0bhj-",
+  "tags": []
+}
